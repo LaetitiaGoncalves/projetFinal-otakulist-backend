@@ -7,6 +7,8 @@ const encBase64 = require("crypto-js/enc-base64");
 const uid2 = require("uid2");
 const fileUpload = require("express-fileupload");
 const cloudinary = require("cloudinary").v2;
+const apicache = require("apicache");
+const cache = apicache.middleware;
 
 const app = express();
 app.use(express.json());
@@ -93,7 +95,7 @@ app.post("/login", async (req, res) => {
 });
 
 // Route pour obtenir la liste d'animes de la saison actuelle
-app.get("/seasonal", async (req, res) => {
+app.get("/seasonal", cache("5 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/seasons/now";
     const response = await axios.get(url, {
@@ -112,7 +114,7 @@ app.get("/seasonal", async (req, res) => {
 });
 
 // Route pour obtenir la liste d'animes de la saison prochaine
-app.get("/seasonal/upcoming", async (req, res) => {
+app.get("/seasonal/upcoming", cache("5 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/seasons/upcoming";
     const response = await axios.get(url);
@@ -127,7 +129,7 @@ app.get("/seasonal/upcoming", async (req, res) => {
 
 // Route pour obtenir le classement des 100 meilleurs animes
 
-app.get("/topanime", async (req, res) => {
+app.get("/topanime", cache("5 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
@@ -138,16 +140,21 @@ app.get("/topanime", async (req, res) => {
     });
     res.status(200).json(response.data);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "Erreur de récupération du classement des meilleurs animés",
-    });
+    if (error.response && error.response.status === 429) {
+      console.error("Rate limit reached. Please try again later.");
+      res
+        .status(429)
+        .json({ error: "Rate limit reached. Please try again later." });
+    } else {
+      console.error(error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
 });
 
 // Route pour obtenir le classement des animés les plus populaires
 
-app.get("/airing", async (req, res) => {
+app.get("/airing", cache("5 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
@@ -168,7 +175,7 @@ app.get("/airing", async (req, res) => {
 
 // Route pour obtenir le classement des animés les plus attendus
 
-app.get("/upcoming", async (req, res) => {
+app.get("/upcoming", cache("5 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
