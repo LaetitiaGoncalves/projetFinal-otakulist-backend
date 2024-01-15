@@ -8,6 +8,7 @@ const uid2 = require("uid2");
 const fileUpload = require("express-fileupload");
 const cloudinary = require("cloudinary").v2;
 const apicache = require("apicache");
+
 const cache = apicache.middleware;
 
 const app = express();
@@ -114,7 +115,7 @@ app.get("/seasonal", cache("5 minutes"), async (req, res) => {
 });
 
 // Route pour obtenir la liste d'animes de la saison prochaine
-app.get("/seasonal/upcoming", cache("5 minutes"), async (req, res) => {
+app.get("/seasonal/upcoming", cache("50 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/seasons/upcoming";
     const response = await axios.get(url);
@@ -129,7 +130,7 @@ app.get("/seasonal/upcoming", cache("5 minutes"), async (req, res) => {
 
 // Route pour obtenir le classement des 100 meilleurs animes
 
-app.get("/topanime", cache("5 minutes"), async (req, res) => {
+app.get("/topanime", cache("50 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
@@ -154,7 +155,7 @@ app.get("/topanime", cache("5 minutes"), async (req, res) => {
 
 // Route pour obtenir le classement des animés les plus populaires
 
-app.get("/airing", cache("5 minutes"), async (req, res) => {
+app.get("/airing", cache("50 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
@@ -175,7 +176,7 @@ app.get("/airing", cache("5 minutes"), async (req, res) => {
 
 // Route pour obtenir le classement des animés les plus attendus
 
-app.get("/upcoming", cache("5 minutes"), async (req, res) => {
+app.get("/upcoming", cache("50 minutes"), async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
