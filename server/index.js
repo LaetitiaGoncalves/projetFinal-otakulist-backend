@@ -268,6 +268,21 @@ app.get("/genres/anime", async (req, res) => {
   }
 });
 
+//Route pour rechercher un anime
+
+app.get("/searchanime", async (req, res) => {
+  try {
+    const url = `https://api.jikan.moe/v4/anime`;
+    const response = await axios.get(url);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "Erreur de récupération de la recherche",
+    });
+  }
+});
+
 app.all("*", (req, res) => {
   res.status(404).json({ message: "route not found !" });
 });
