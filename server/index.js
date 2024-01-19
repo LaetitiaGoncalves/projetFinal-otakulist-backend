@@ -272,8 +272,10 @@ app.get("/genres/anime", async (req, res) => {
 
 app.get("/searchanime", async (req, res) => {
   try {
-    const url = `https://api.jikan.moe/v4/anime`;
-    const response = await axios.get(url);
+    const search = req.query.search;
+    const response = await axios.get(
+      `https://api.jikan.moe/v4/anime?q=${search}`
+    );
     res.status(200).json(response.data);
   } catch (error) {
     console.error(error);
