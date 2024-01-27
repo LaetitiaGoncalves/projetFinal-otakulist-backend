@@ -153,7 +153,7 @@ app.get("/topanime", cache("50 minutes"), async (req, res) => {
   }
 });
 
-// Route pour obtenir le classement des animés les plus populaires
+// Route pour obtenir le classement des animés les plus populaires du moment
 
 app.get("/airing", cache("50 minutes"), async (req, res) => {
   try {
@@ -170,6 +170,23 @@ app.get("/airing", cache("50 minutes"), async (req, res) => {
     console.error(error);
     res.status(500).json({
       error: "Erreur de récupération du classement des meilleurs animés",
+    });
+  }
+});
+
+// Route pour obtenir le classement des animés les plus populaires
+
+app.get("/popularity", cache("50 minutes"), async (req, res) => {
+  try {
+    const url = "https://api.jikan.moe/v4/top/anime?popularity";
+    const response = await axios.get(url);
+    console.log("Réponse de l'API Jikan : ", response.data); // Log pour débogage
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Erreur Axios : ", error.response || error); // Log détaillé de l'erreur
+    res.status(500).json({
+      error:
+        "Erreur de récupération du classement des animés les plus populaires",
     });
   }
 });
