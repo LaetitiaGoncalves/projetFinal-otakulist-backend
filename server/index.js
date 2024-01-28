@@ -9,13 +9,32 @@ const fileUpload = require("express-fileupload");
 const cloudinary = require("cloudinary").v2;
 const apicache = require("apicache");
 
-const cache = apicache.middleware;
+const NodeCache = require("node-cache");
+const myCache = new NodeCache();
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 const PORT = 3001;
 mongoose.connect("mongodb://localhost:27017/otakulist");
+
+// Middleware de caching
+const customCacheMiddleware = async (req, res, next) => {
+  const key = req.originalUrl || req.url;
+  const cachedResponse = myCache.get(key);
+
+  if (cachedResponse) {
+    console.log("Serving from cache");
+    return res.status(200).json(cachedResponse);
+  } else {
+    res.sendResponse = res.json;
+    res.json = (body) => {
+      myCache.set(key, body, 24 * 60 * 60);
+      res.sendResponse(body);
+    };
+    next();
+  }
+};
 
 const convertToBase64 = (file) => {
   return `data:${file.mimetype};base64,${file.data.toString("base64")}`;
@@ -96,7 +115,7 @@ app.post("/login", async (req, res) => {
 });
 
 // Route pour obtenir la liste d'animes de la saison actuelle
-app.get("/seasonal", cache("5 minutes"), async (req, res) => {
+app.get("/seasonal", customCacheMiddleware, async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/seasons/now";
     const response = await axios.get(url, {
@@ -115,7 +134,7 @@ app.get("/seasonal", cache("5 minutes"), async (req, res) => {
 });
 
 // Route pour obtenir la liste d'animes de la saison prochaine
-app.get("/seasonal/upcoming", cache("50 minutes"), async (req, res) => {
+app.get("/seasonal/upcoming", customCacheMiddleware, async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/seasons/upcoming";
     const response = await axios.get(url);
@@ -130,7 +149,7 @@ app.get("/seasonal/upcoming", cache("50 minutes"), async (req, res) => {
 
 // Route pour obtenir le classement des 100 meilleurs animes
 
-app.get("/topanime", cache("50 minutes"), async (req, res) => {
+app.get("/topanime", customCacheMiddleware, async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
@@ -155,7 +174,7 @@ app.get("/topanime", cache("50 minutes"), async (req, res) => {
 
 // Route pour obtenir le classement des animés les plus populaires du moment
 
-app.get("/airing", cache("50 minutes"), async (req, res) => {
+app.get("/airing", customCacheMiddleware, async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
@@ -176,7 +195,7 @@ app.get("/airing", cache("50 minutes"), async (req, res) => {
 
 // Route pour obtenir le classement des animés les plus populaires
 
-app.get("/popularity", cache("50 minutes"), async (req, res) => {
+app.get("/popularity", customCacheMiddleware, async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime?popularity";
     const response = await axios.get(url);
@@ -193,7 +212,7 @@ app.get("/popularity", cache("50 minutes"), async (req, res) => {
 
 // Route pour obtenir le classement des animés les plus attendus
 
-app.get("/upcoming", cache("50 minutes"), async (req, res) => {
+app.get("/upcoming", customCacheMiddleware, async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime";
     const response = await axios.get(url, {
@@ -214,7 +233,7 @@ app.get("/upcoming", cache("50 minutes"), async (req, res) => {
 
 //Route pour obtenir les informations sur un anime
 
-app.get("/anime/:id", async (req, res) => {
+app.get("/anime/:id", customCacheMiddleware, async (req, res) => {
   try {
     const url = `https://api.jikan.moe/v4/anime/${req.params.id}/full`;
     const response = await axios.get(url);
@@ -228,7 +247,7 @@ app.get("/anime/:id", async (req, res) => {
 });
 
 //Route pour obtenir les images d'un anime
-app.get("/anime/pictures/:id", async (req, res) => {
+app.get("/anime/pictures/:id", customCacheMiddleware, async (req, res) => {
   try {
     const url = `https://api.jikan.moe/v4/anime/${req.params.id}/pictures`;
     const response = await axios.get(url);
@@ -240,6 +259,24 @@ app.get("/anime/pictures/:id", async (req, res) => {
     });
   }
 });
+
+//Route pour obtenir les recommandations pour un anime
+app.get(
+  "/anime/recommandations/:id",
+  customCacheMiddleware,
+  async (req, res) => {
+    try {
+      const url = `https://api.jikan.moe/v4/anime/${req.params.id}/recommendations`;
+      const response = await axios.get(url);
+      res.status(200).json(response.data);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({
+        error: "Erreur de récupération des recommandations",
+      });
+    }
+  }
+);
 
 //Route pour obtenir les personnages d'un anime avec les seiyuu
 app.get("/anime/:id/characters", async (req, res) => {
@@ -287,7 +324,7 @@ app.get("/genres/anime", async (req, res) => {
 
 //Route pour rechercher un anime
 
-app.get("/searchanime", async (req, res) => {
+app.get("/searchanime", customCacheMiddleware, async (req, res) => {
   try {
     const search = req.query.search;
     const response = await axios.get(
