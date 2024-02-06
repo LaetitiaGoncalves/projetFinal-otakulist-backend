@@ -63,7 +63,7 @@ app.post("/signup", fileUpload(), async (req, res) => {
           hash: hash,
           salt: salt,
         });
-        /*
+
         const userAvatar = await cloudinary.uploader.upload(
           convertToBase64(req.files.avatar),
           {
@@ -71,8 +71,8 @@ app.post("/signup", fileUpload(), async (req, res) => {
             public_id: "avatar",
           }
         );
-     newUser.avatar = userAvatar;
-     */
+        newUser.avatar = userAvatar;
+
         await newUser.save();
 
         res.json({
