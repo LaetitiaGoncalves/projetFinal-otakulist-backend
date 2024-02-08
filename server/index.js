@@ -8,6 +8,7 @@ const uid2 = require("uid2");
 const fileUpload = require("express-fileupload");
 const cloudinary = require("cloudinary").v2;
 const apicache = require("apicache");
+require("dotenv").config();
 
 const NodeCache = require("node-cache");
 const myCache = new NodeCache();
@@ -36,25 +37,42 @@ const customCacheMiddleware = async (req, res, next) => {
   }
 };
 
+// Configuration de Cloudinary
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.API_KEY_CLOUD,
+  api_secret: process.env.API_SECRET,
+});
+
 const convertToBase64 = (file) => {
   return `data:${file.mimetype};base64,${file.data.toString("base64")}`;
 };
+
+// Models
+
 const User = require("./models/User");
 
 // Création d'un user
 
 app.post("/signup", fileUpload(), async (req, res) => {
   try {
+    console.log("Signup request received", req.body); // Log pour vérifier les données reçues
+
     if (req.body.username === undefined) {
+      console.log("Missing username");
       res.status(400).json({ error: "Missing parameter" });
     } else {
       const isEmailAlreadyInBDD = await User.findOne({ email: req.body.email });
       if (isEmailAlreadyInBDD !== null) {
+        console.log("Email already exists");
         res.json({ message: "This email already has an account" });
       } else {
         const salt = uid2(16);
         const hash = SHA256(req.body.password + salt).toString(encBase64);
         const token = uid2(32);
+
+        console.log("Creating new user"); // Log avant la création de l'utilisateur
 
         const newUser = new User({
           email: req.body.email,
@@ -64,6 +82,8 @@ app.post("/signup", fileUpload(), async (req, res) => {
           salt: salt,
         });
 
+        console.log("Uploading avatar to Cloudinary"); // Log avant l'upload de l'avatar
+
         const userAvatar = await cloudinary.uploader.upload(
           convertToBase64(req.files.avatar),
           {
@@ -71,19 +91,26 @@ app.post("/signup", fileUpload(), async (req, res) => {
             public_id: "avatar",
           }
         );
+
+        console.log("Avatar uploaded", userAvatar); // Log après l'upload de l'avatar
+
         newUser.avatar = userAvatar;
 
         await newUser.save();
 
+        console.log("User created successfully", newUser); // Log après la création de l'utilisateur
+
         res.json({
           _id: newUser._id,
           email: newUser.email,
+          username: newUser.username,
           avatar: newUser.avatar,
           token: newUser.token,
         });
       }
     }
   } catch (error) {
+    console.error("Signup error", error); // Log pour capturer les erreurs
     res.status(400).json({ message: error.message });
   }
 });
