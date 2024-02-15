@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-const mongoose = require("mongoose");
 const SHA256 = require("crypto-js/sha256");
 const encBase64 = require("crypto-js/enc-base64");
 const uid2 = require("uid2");
@@ -17,7 +16,9 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 const PORT = 3001;
-mongoose.connect("mongodb://localhost:27017/otakulist");
+
+const db = require("./config/database");
+const List = require("./models/List");
 
 // Middleware de caching
 const customCacheMiddleware = async (req, res, next) => {
@@ -57,87 +58,76 @@ const User = require("./models/User");
 
 app.post("/signup", fileUpload(), async (req, res) => {
   try {
-    console.log("Signup request received", req.body); // Log pour vérifier les données reçues
-
-    if (req.body.username === undefined) {
-      console.log("Missing username");
-      res.status(400).json({ error: "Missing parameter" });
-    } else {
-      const isEmailAlreadyInBDD = await User.findOne({ email: req.body.email });
-      if (isEmailAlreadyInBDD !== null) {
-        console.log("Email already exists");
-        res.json({ message: "This email already has an account" });
-      } else {
-        const salt = uid2(16);
-        const hash = SHA256(req.body.password + salt).toString(encBase64);
-        const token = uid2(32);
-
-        console.log("Creating new user"); // Log avant la création de l'utilisateur
-
-        const newUser = new User({
-          email: req.body.email,
-          username: req.body.username,
-          token: token,
-          hash: hash,
-          salt: salt,
-        });
-
-        console.log("Uploading avatar to Cloudinary"); // Log avant l'upload de l'avatar
-
-        const userAvatar = await cloudinary.uploader.upload(
-          convertToBase64(req.files.avatar),
-          {
-            folder: `api/otakulist/users/${newUser._id}`,
-            public_id: "avatar",
-          }
-        );
-
-        console.log("Avatar uploaded", userAvatar); // Log après l'upload de l'avatar
-
-        newUser.avatar = userAvatar;
-
-        await newUser.save();
-
-        console.log("User created successfully", newUser); // Log après la création de l'utilisateur
-
-        res.json({
-          _id: newUser._id,
-          email: newUser.email,
-          username: newUser.username,
-          avatar: newUser.avatar,
-          token: newUser.token,
-        });
-      }
+    if (!req.body.username || !req.body.email || !req.body.password) {
+      return res.status(400).json({ error: "Missing parameters" });
     }
+
+    const userExists = await User.findByEmail(req.body.email);
+    if (userExists) {
+      return res
+        .status(409)
+        .json({ message: "This email already has an account" });
+    }
+
+    const salt = uid2(16);
+    const hash = SHA256(req.body.password + salt).toString(encBase64);
+    const token = uid2(32);
+
+    const avatarUpload = req.files?.avatar
+      ? await cloudinary.uploader.upload(convertToBase64(req.files.avatar), {
+          folder: `api/otakulist/users`,
+          public_id: "avatar_" + new Date().getTime(),
+        })
+      : null;
+
+    const newUser = await User.create({
+      email: req.body.email,
+      username: req.body.username,
+      avatarUrl: avatarUpload ? avatarUpload.url : null,
+      avatarPublicId: avatarUpload ? avatarUpload.public_id : null,
+      hash,
+      salt,
+      token,
+    });
+
+    res.json({
+      _id: newUser.id,
+      email: req.body.email,
+      username: req.body.username,
+      avatar: avatarUpload ? avatarUpload.url : null,
+      token: token,
+    });
   } catch (error) {
-    console.error("Signup error", error); // Log pour capturer les erreurs
-    res.status(400).json({ message: error.message });
+    console.error("Signup error", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
 // Login d'un User
 app.post("/login", async (req, res) => {
   try {
-    const userToCheck = await User.findOne({ email: req.body.email });
-
-    if (userToCheck) {
-      if (
-        SHA256(req.body.password + userToCheck.salt).toString(encBase64) ===
-        userToCheck.hash
-      ) {
-        res.status(200).json({
-          _id: userToCheck._id,
-          token: userToCheck.token,
-          username: userToCheck.username,
-        });
-      } else {
-        res.status(401).json({ error: "Unauthorized" });
-      }
-    } else {
-      res.status(400).json({ message: "User not found" });
+    if (!req.body.email || !req.body.password) {
+      return res.status(400).json({ error: "Missing parameters" });
     }
+
+    const user = await User.findByEmail(req.body.email);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const hash = SHA256(req.body.password + user.salt).toString(encBase64);
+    if (hash !== user.hash) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    res.json({
+      _id: user.id,
+      token: user.token,
+      username: user.username,
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error("Login error", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
@@ -226,10 +216,10 @@ app.get("/popularity", customCacheMiddleware, async (req, res) => {
   try {
     const url = "https://api.jikan.moe/v4/top/anime?popularity";
     const response = await axios.get(url);
-    console.log("Réponse de l'API Jikan : ", response.data); // Log pour débogage
+    console.log("Réponse de l'API Jikan : ", response.data);
     res.status(200).json(response.data);
   } catch (error) {
-    console.error("Erreur Axios : ", error.response || error); // Log détaillé de l'erreur
+    console.error("Erreur Axios : ", error.response || error);
     res.status(500).json({
       error:
         "Erreur de récupération du classement des animés les plus populaires",
@@ -363,6 +353,27 @@ app.get("/searchanime", customCacheMiddleware, async (req, res) => {
     res.status(500).json({
       error: "Erreur de récupération de la recherche",
     });
+  }
+});
+
+//ajouter un animé à sa liste
+
+app.post("/liste", async (req, res) => {
+  const { userId, title, image, status } = req.body;
+
+  if (!userId || !title || !status) {
+    return res.status(400).send("Missing data");
+  }
+
+  try {
+    await List.create({ title, image, userId, status });
+
+    res.status(200).send({
+      message: "Anime added to favorites successfully",
+    });
+  } catch (error) {
+    console.error("Failed to insert into LISTS:", error);
+    res.status(500).send("Failed to add to favorites");
   }
 });
 
