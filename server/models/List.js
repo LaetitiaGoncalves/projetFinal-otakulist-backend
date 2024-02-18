@@ -1,11 +1,11 @@
 const db = require("../config/database");
 
 class List {
-  // Insérer un élement dans la liste
-  static create({ title, image, userId, status }) {
+  // Insérer un élément dans la liste
+  static create({ title, image, userId, animeId, status }) {
     return db.execute(
-      "INSERT INTO lists (title, image, user_id, status) VALUES (?, ?, ?, ?)",
-      [title, image, userId, status]
+      "INSERT INTO lists (title, image, user_id, anime_id, status) VALUES (?, ?, ?, ?, ?)",
+      [title, image, userId, animeId, status]
     );
   }
 
@@ -23,6 +23,21 @@ class List {
       userId,
       status,
     ]);
+  }
+
+  // Trouver un élément par userId et animeId
+  static findByUserIdAndAnimeId(userId, animeId) {
+    return db.execute(
+      "SELECT * FROM lists WHERE user_id = ? AND anime_id = ?",
+      [userId, animeId]
+    );
+  }
+  // Mettre à jour un élément de la liste par userId et animeId
+  static updateByAnimeId(userId, animeId, { title, image, status }) {
+    return db.execute(
+      "UPDATE lists SET title = ?, image = ?, status = ? WHERE user_id = ? AND anime_id = ?",
+      [title, image, status, userId, animeId]
+    );
   }
 }
 

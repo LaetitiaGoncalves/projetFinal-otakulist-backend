@@ -17,8 +17,13 @@ app.use(express.json());
 app.use(cors());
 const PORT = 3001;
 
-const db = require("./config/database");
+// Models
+
+const User = require("./models/User");
 const List = require("./models/List");
+
+// Connexion à la base de données
+const db = require("./config/database");
 
 // Middleware de caching
 const customCacheMiddleware = async (req, res, next) => {
@@ -50,9 +55,32 @@ const convertToBase64 = (file) => {
   return `data:${file.mimetype};base64,${file.data.toString("base64")}`;
 };
 
-// Models
+// Middleware de vérification d'authentification
 
-const User = require("./models/User");
+const isAuthenticated = async (req, res, next) => {
+  console.log(req.headers.authorization);
+  if (req.headers.authorization) {
+    const token = req.headers.authorization.replace("Bearer ", "");
+
+    const query = "SELECT * FROM users WHERE token = ?";
+
+    try {
+      const [user] = await db.execute(query, [token]);
+
+      if (user.length > 0) {
+        req.user = user[0];
+        next();
+      } else {
+        res.status(401).json({ error: "Token présent mais non valide !" });
+      }
+    } catch (error) {
+      console.error("Erreur de base de données", error);
+      res.status(500).json({ error: "Erreur de serveur interne" });
+    }
+  } else {
+    res.status(401).json({ error: "Token non envoyé !" });
+  }
+};
 
 // Création d'un user
 
@@ -356,24 +384,33 @@ app.get("/searchanime", customCacheMiddleware, async (req, res) => {
   }
 });
 
-//ajouter un animé à sa liste
+//ajouter un animé à la liste d'un user et changer son statut
 
-app.post("/liste", async (req, res) => {
-  const { userId, title, image, status } = req.body;
+app.put("/list", isAuthenticated, async (req, res) => {
+  const { userId, animeId, title, image, status } = req.body;
 
-  if (!userId || !title || !status) {
-    return res.status(400).send("Missing data");
-  }
+  console.log(
+    "Mise à jour/ajout de l'anime avec les données suivantes :",
+    req.body
+  );
 
   try {
-    await List.create({ title, image, userId, status });
+    const [existing] = await List.findByUserIdAndAnimeId(userId, animeId);
 
-    res.status(200).send({
-      message: "Anime added to favorites successfully",
-    });
+    if (existing.length > 0) {
+      // L'anime existe déjà, mise à jour de son statut
+      await List.updateByAnimeId(userId, animeId, { title, image, status });
+      console.log("Statut de l'anime mis à jour avec succès.");
+      res.json({ message: "Statut de l'anime mis à jour avec succès" });
+    } else {
+      // L'anime n'existe pas, ajout à la liste
+      await List.create({ userId, animeId, title, image, status });
+      console.log("Anime ajouté à la liste avec succès.");
+      res.json({ message: "Anime ajouté à la liste avec succès" });
+    }
   } catch (error) {
-    console.error("Failed to insert into LISTS:", error);
-    res.status(500).send("Failed to add to favorites");
+    console.error("Erreur lors de la mise à jour/ajout de l'anime:", error);
+    res.status(500).json({ message: "Erreur interne du serveur" });
   }
 });
 
