@@ -414,6 +414,31 @@ app.put("/list", isAuthenticated, async (req, res) => {
   }
 });
 
+// Récupérer la liste complète des animes d'un utilisateur avec leur statut
+app.get("/list/:userId", isAuthenticated, async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const [list] = await List.findAllByUserId(userId);
+
+    if (list.length > 0) {
+      // Si l'utilisateur a une liste, renvoyez-la
+      res.json(list);
+    } else {
+      // Si l'utilisateur n'a pas de liste
+      res.json({
+        message: "Aucun anime trouvé dans la liste de cet utilisateur.",
+      });
+    }
+  } catch (error) {
+    console.error(
+      "Erreur lors de la récupération de la liste de l'anime:",
+      error
+    );
+    res.status(500).json({ message: "Erreur interne du serveur" });
+  }
+});
+
 app.all("*", (req, res) => {
   res.status(404).json({ message: "route not found !" });
 });

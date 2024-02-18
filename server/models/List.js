@@ -32,12 +32,18 @@ class List {
       [userId, animeId]
     );
   }
+
   // Mettre à jour un élément de la liste par userId et animeId
   static updateByAnimeId(userId, animeId, { title, image, status }) {
     return db.execute(
       "UPDATE lists SET title = ?, image = ?, status = ? WHERE user_id = ? AND anime_id = ?",
       [title, image, status, userId, animeId]
     );
+  }
+
+  // Récupérer les éléments de la liste d'un utilisateur
+  static findAllByUserId(userId) {
+    return db.execute("SELECT * FROM lists WHERE user_id = ?", [userId]);
   }
 }
 
