@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "apicache": "^1.6.3",
     "axios": "^1.6.0",
     "cloudinary": "^1.41.0",
     "cors": "^2.8.5",
