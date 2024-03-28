@@ -45,6 +45,17 @@ class List {
   static findAllByUserId(userId) {
     return db.execute("SELECT * FROM lists WHERE user_id = ?", [userId]);
   }
+
+  // Récupérer la liste d'un user avec jointure
+  static findAllByUserIdWithJoin(userId) {
+    return db.execute(
+      `SELECT lists.id, lists.title, lists.image, lists.anime_id, lists.status
+    FROM lists
+    JOIN users ON lists.user_id = users.id
+    WHERE users.id = ?`,
+      [userId]
+    );
+  }
 }
 
 module.exports = List;

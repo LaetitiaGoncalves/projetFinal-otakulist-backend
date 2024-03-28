@@ -414,27 +414,35 @@ app.put("/list", isAuthenticated, async (req, res) => {
   }
 });
 
-// Récupérer la liste complète des animes d'un utilisateur avec leur statut
+//Afficher la liste d'un User
+
 app.get("/list/:userId", isAuthenticated, async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.params.userId;
+  console.log("Requested userId:", userId);
+
+  if (req.user.id.toString() !== userId) {
+    console.log("Access denied for userId:", userId);
+    return res
+      .status(403)
+      .json({ message: "Accès non autorisé à cette liste." });
+  }
 
   try {
-    const [list] = await List.findAllByUserId(userId);
+    const [list] = await List.findAllByUserIdWithJoin(userId);
+    console.log("List items found:", list);
 
     if (list.length > 0) {
-      // Si l'utilisateur a une liste, renvoyez-la
       res.json(list);
     } else {
-      // Si l'utilisateur n'a pas de liste
-      res.json({
-        message: "Aucun anime trouvé dans la liste de cet utilisateur.",
-      });
+      console.log("No items found for userId:", userId);
+      res
+        .status(404)
+        .json({
+          message: "Aucun anime trouvé dans la liste de cet utilisateur.",
+        });
     }
   } catch (error) {
-    console.error(
-      "Erreur lors de la récupération de la liste de l'anime:",
-      error
-    );
+    console.error("Error fetching list for userId:", userId, error);
     res.status(500).json({ message: "Erreur interne du serveur" });
   }
 });
