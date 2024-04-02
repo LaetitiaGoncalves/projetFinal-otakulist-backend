@@ -447,6 +447,47 @@ app.get("/list/:userId", isAuthenticated, async (req, res) => {
   }
 });
 
+// Route pour creer un admin
+
+app.post('/admin2506/register', async (req, res) => {
+  try {
+    if (!req.body.email || !req.body.password) {
+      return res.status(400).json({ error: "Missing parameters" });
+    }
+
+    const adminExists = await Admin.findByEmail(req.body.email);
+    if (adminExists) {
+      return res
+        .status(409)
+        .json({ message: "This email already has an account" });
+    }
+
+    const salt = uid2(16);
+    const hash = SHA256(req.body.password + salt).toString(encBase64);
+    const token = uid2(32);
+
+    const newAdmin = await Admin.create({
+      email: req.body.email,
+     droits: req.body.droits,
+      hash,
+      salt,
+      token,
+    });
+
+    res.json({
+      _id: newAdmin.id,
+      email: req.body.email,
+      droits: req.body.droits,
+      token: token,
+    });
+  } catch (error) {
+    console.error("Signup error", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+
+
 app.all("*", (req, res) => {
   res.status(404).json({ message: "route not found !" });
 });
